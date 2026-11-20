@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "generatedAt": "2026-11-20T17:04:10.759Z",
+  "instructionHash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "startup": {
+    "command": "docker compose -f docker/docker-compose.yml up -d --build",
+    "port": 9091,
+    "healthCheckPath": "/api/app/about",
+    "context": "Built and started the existing Compose app service from docker/docker-compose.yml. Verified the FastAPI backend responded with HTTP 200 on http://127.0.0.1:9091/api/app/about after initial database startup completed."
+  },
+  "auth": {
+    "authObjectId": "5vjnAR7De1mbueJT2xg4WE",
+    "protectedResource": {
+      "method": "GET",
+      "url": "/api/users/self"
+    },
+    "context": "Verified jwt authentication using POST /api/auth/token."
+  },
+  "scanPrep": {
+    "context": "Summary: Inventoried inbound repeated-request controls, found a 5-attempt credential login lockout as the only scanner-relevant limiter, reproduced it on /api/auth/token (401 x5 then 423), disabled it durably, rebuilt the mealie service, and verified repeated bad logins now stay 401 without locking the account while valid logins still require correct credentials.; verified: The only changed anti-automation control was Mealie credential lockout on POST /api/auth/token; the original code allowed 5 bad-password attempts for an existing local user before 423 lockout, and in the running app 7 same-source bad-password requests for changeme@example.com all returned 401 with no lockout or other repeated-request block.\nChange: Disabled credential-login lockout enforcement when SECURITY_MAX_LOGIN_ATTEMPTS is 0 by making the credentials provider skip failed-attempt counting and the locked-user check in that mode.\nChange: Set docker/docker-compose.yml to start the mealie service with SECURITY_MAX_LOGIN_ATTEMPTS=\"0\" so the lockout bypass survives rebuilds and restarts.\nRecovery guidance (security controls): Relevant limiter inventory: credentials login lockout only. Source showed SECURITY_MAX_LOGIN_ATTEMPTS defaulting to 5 in mealie/core/settings/settings.py and enforced in mealie/core/security/providers/credentials_provider.py; session lifetime remains TOKEN_TIME=48h, which is already long enough for scanning, and no inbound CAPTCHA/rate-limit middleware/bot challenge was found. Current durable bypass is docker/docker-compose.yml: SECURITY_MAX_LOGIN_ATTEMPTS=\"0\" plus provider logic that treats 0 as disabled. If you need to recheck after future changes, rebuild just the service with the same basis command narrowed to mealie: `docker compose -f docker/docker-compose.yml up -d --build mealie`. A useful verification pattern is: log in at `POST /api/auth/token` with form fields `username` and `password`; create a throwaway user through the admin API; send 7 wrong-password attempts for that throwaway from one client; confirm they all return 401 (not 423), then confirm a correct login still returns 200. In this environment the default seeded admin account was `admin` / `MyPassword` during verification.\nRecovery guidance (2FA/MFA): Relevant findings for a future scan-prep pass: backend searches for `2fa|mfa|totp|otp|webauthn|passkey|authenticator` in `mealie/` and DB model/migration code return no 2FA implementation. The login path is `POST /api/auth/token` in `mealie/routes/auth/auth.py`, which calls `CredentialsProvider.authenticate()` in `mealie/core/security/providers/credentials_provider.py`; after password verification it immediately returns an access token with no second-factor branch. The persisted user store in the running container is SQLite at `/app/data/mealie.db` (despite Postgres env vars being present), and `PRAGMA table_info(users)` shows no 2FA-related columns. The test user row for `changeme@example.com` currently has `auth_method='MEALIE'`, `login_attemps=0`, `locked_at=NULL`, `tokens_valid_after=NULL`. Verification commands used: `curl -X POST http://localhost:9091/api/auth/token -H 'Content-Type: application/x-www-form-urlencoded' --data 'username=changeme@example.com&password=MyPassword'` and then `GET http://localhost:9091/api/users/self` / `GET http://localhost:9091/api/recipes?perPage=1` with the returned token or session cookie, both of which returned `200` instead of any 2FA prompt or auth hold."
+  }
+}
