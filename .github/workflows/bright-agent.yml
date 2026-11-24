@@ -45,6 +45,7 @@ jobs:
           INFERENCE_TOKEN: ${{ secrets.INFERENCE_TOKEN }}
           SCAN_SCOPE: full
           AI_MODEL: gpt-5.4
+          BRIGHT_DEBUG: "1"
         run: "${{ runner.temp }}/${{ env.ASSET }}"
 
 # NOTE: commits/PRs made with GITHUB_TOKEN don't trigger your other workflows.
