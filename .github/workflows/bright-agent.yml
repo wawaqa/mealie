@@ -46,7 +46,25 @@ jobs:
           SCAN_SCOPE: full
           AI_MODEL: gpt-5.4
           BRIGHT_DEBUG: "1"
+          BRIGHT_DUMP_TURNS: "1"
+          BRIGHT_DUMP_DIR: "${{ runner.temp }}/bright-agent-turn-dumps"
         run: "${{ runner.temp }}/${{ env.ASSET }}"
+
+      - name: Upload Bright Agent logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bright-agent-logs
+          path: ~/.bright-agent/logs/
+          if-no-files-found: ignore
+
+      - name: Upload Bright Agent LLM turn dumps
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bright-agent-turn-dumps
+          path: ${{ runner.temp }}/bright-agent-turn-dumps/
+          if-no-files-found: ignore
 
 # NOTE: commits/PRs made with GITHUB_TOKEN don't trigger your other workflows.
 # Use a PAT as REPO_ACCESS_TOKEN if you need fix commits to re-run CI.
